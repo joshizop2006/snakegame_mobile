@@ -1,4 +1,3 @@
-// ...existing code...
 <!doctype html>
 <html lang="en">
 <head>
@@ -82,7 +81,37 @@
   const scoreEl = document.getElementById('score');
   const highEl = document.getElementById('high');
   const spdEl = document.getElementById('spd');
-  document.getElementById('restart').addEventListener('click', () => resetGame());
+  
+// enlarge + center the mobile D‑pad (runtime override so markup/CSS stays simple)
+const controlsEl = document.getElementById('controls');
+if (controlsEl) {
+    controlsEl.style.left = '50%';
+    controlsEl.style.transform = 'translateX(-50%)';
+    controlsEl.style.bottom = '18px';
+    controlsEl.style.display = 'flex';
+    controlsEl.style.justifyContent = 'center';
+    controlsEl.style.alignItems = 'center';
+    controlsEl.style.zIndex = '20';
+}
+
+// bigger dpad rows and buttons
+const dpad = controlsEl && controlsEl.querySelector('.dpad');
+if (dpad) {
+    dpad.style.gridTemplateRows = '72px 72px 72px';
+    dpad.style.gap = '12px';
+    const rows = dpad.querySelectorAll('.row');
+    rows.forEach(r => r.style.gap = '12px');
+}
+
+document.querySelectorAll('.dbtn').forEach(btn => {
+    btn.style.width = '96px';
+    btn.style.height = '72px';
+    btn.style.fontSize = '28px';
+    btn.style.borderRadius = '12px';
+    btn.style.background = 'rgba(0,0,0,0.45)';
+    btn.style.border = '1px solid rgba(255,255,255,0.08)';
+    btn.style.touchAction = 'none';
+});stener('click', () => resetGame());
 
   // --- scale management for responsive / mobile ---
   function updateScale(){
