@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Retro Snake (HTML5)</title>
+<title>Retro Snake (HTML5) - Mobile Friendly</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <style>
   :root{ --cell-size:16px; }
@@ -12,29 +12,45 @@
   .ui{margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
   .hint{opacity:.95;font-size:14px}
   button{background:#13202b;color:#bfeaff;border:1px solid #234;border-radius:4px;padding:6px 10px;cursor:pointer}
-  /* Mobile D-pad */
-  .controls{position:absolute;bottom:18px;left:18px;display:none;align-items:center;gap:8px;z-index:20}
-  .dpad{display:grid;grid-template-rows:48px 48px 48px;gap:6px;align-items:center}
-  .dpad .row{display:flex;gap:6px;justify-content:center}
-  .dbtn{width:64px;height:48px;border-radius:8px;background:rgba(0,0,0,0.35);color:var(--text,#bfeaff);font-size:20px;border:1px solid rgba(255,255,255,0.06);touch-action:none}
-  /* Show controls on small screens */
-  @media (max-width:900px){
-    .controls{display:flex}
-    canvas{max-width:calc(100vw - 36px); max-height:calc(100vh - 160px); width:auto; height:auto;}
-    .ui{position:fixed;right:12px;top:12px;flex-direction:column;align-items:flex-end;background:transparent}
+
+  /* Big centered mobile controls */
+  .controls-wrap{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:40}
+  .dpad{display:grid;grid-template-columns:84px 84px 84px;grid-template-rows:84px 84px 84px;gap:12px;pointer-events:auto}
+  .dbtn{width:84px;height:84px;border-radius:14px;background:rgba(20,30,30,0.9);color:var(--text,#bfeaff);font-size:28px;border:2px solid rgba(255,255,255,0.06);touch-action:none;display:flex;align-items:center;justify-content:center;user-select:none}
+  .cell-empty{width:84px;height:84px;opacity:0}
+
+  /* Hide controls on large screens */
+  @media (min-width:900px){
+    .controls-wrap{display:none}
+    canvas{max-width:900px; max-height:675px;}
+  }
+
+  /* Small-screen layout tweaks */
+  @media (max-width:420px){
+    .dpad{grid-template-columns:64px 64px 64px;grid-template-rows:64px 64px 64px;gap:8px}
+    .dbtn{width:64px;height:64px;border-radius:10px;font-size:22px}
+    .cell-empty{width:64px;height:64px}
   }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <canvas id="screen"></canvas>
+  <canvas id="screen" aria-label="Game screen"></canvas>
 
-  <!-- Mobile controls (shown by CSS media query) -->
-  <div class="controls" id="controls" aria-hidden="false">
+  <!-- Big centered D-Pad controls -->
+  <div class="controls-wrap" id="controls-wrap" aria-hidden="false">
     <div class="dpad" role="application" aria-label="D-Pad">
-      <div class="row"><button class="dbtn up" aria-label="Up">▲</button></div>
-      <div class="row"><button class="dbtn left" aria-label="Left">◀</button><div style="width:8px"></div><button class="dbtn right" aria-label="Right">▶</button></div>
-      <div class="row"><button class="dbtn down" aria-label="Down">▼</button></div>
+      <div class="cell-empty"></div>
+      <button class="dbtn" id="btn-up" aria-label="Up">▲</button>
+      <div class="cell-empty"></div>
+
+      <button class="dbtn" id="btn-left" aria-label="Left">◀</button>
+      <div class="dbtn" id="btn-cent" aria-hidden="true" style="background:transparent;border:0;box-shadow:none"></div>
+      <button class="dbtn" id="btn-right" aria-label="Right">▶</button>
+
+      <div class="cell-empty"></div>
+      <button class="dbtn" id="btn-down" aria-label="Down">▼</button>
+      <div class="cell-empty"></div>
     </div>
   </div>
 
@@ -48,11 +64,9 @@
 </div>
 
 <script>
-/* Enhanced: responsive scaling + mobile touch & D-pad support
-   Works with the existing game code; only UI/input/scale additions added here.
-*/
+/* Full retro snake game with centered mobile controls, responsive scaling and touch support */
 (() => {
-  // ===== existing game config (unchanged) =====
+  // Config
   const CELL_SIZE = 16;
   const GRID_W = 32;
   const GRID_H = 24;
@@ -70,8 +84,8 @@
   const COLOR_FOOD = '#FF6464';
   const COLOR_OBS = '#787878';
   const COLOR_TEXT = '#B4E6FF';
-  // ===== end existing config =====
 
+  // Canvas setup
   const canvas = document.getElementById('screen');
   canvas.width = SCREEN_W;
   canvas.height = SCREEN_H;
@@ -81,105 +95,22 @@
   const scoreEl = document.getElementById('score');
   const highEl = document.getElementById('high');
   const spdEl = document.getElementById('spd');
-  
-// enlarge + center the mobile D‑pad (runtime override so markup/CSS stays simple)
-const controlsEl = document.getElementById('controls');
-if (controlsEl) {
-    controlsEl.style.left = '50%';
-    controlsEl.style.transform = 'translateX(-50%)';
-    controlsEl.style.bottom = '18px';
-    controlsEl.style.display = 'flex';
-    controlsEl.style.justifyContent = 'center';
-    controlsEl.style.alignItems = 'center';
-    controlsEl.style.zIndex = '20';
-}
+  document.getElementById('restart').addEventListener('click', () => resetGame());
 
-// bigger dpad rows and buttons
-const dpad = controlsEl && controlsEl.querySelector('.dpad');
-if (dpad) {
-    dpad.style.gridTemplateRows = '72px 72px 72px';
-    dpad.style.gap = '12px';
-    const rows = dpad.querySelectorAll('.row');
-    rows.forEach(r => r.style.gap = '12px');
-}
-
-document.querySelectorAll('.dbtn').forEach(btn => {
-    btn.style.width = '96px';
-    btn.style.height = '72px';
-    btn.style.fontSize = '28px';
-    btn.style.borderRadius = '12px';
-    btn.style.background = 'rgba(0,0,0,0.45)';
-    btn.style.border = '1px solid rgba(255,255,255,0.08)';
-    btn.style.touchAction = 'none';
-});stener('click', () => resetGame());
-
-  // --- scale management for responsive / mobile ---
+  // Scaling to keep pixel/artifact look
   function updateScale(){
-    // compute integer scale to keep pixel look when possible
-    const margin = 36; // padding for UI
+    const margin = 36;
     const maxW = Math.max(120, window.innerWidth - margin);
-    const maxH = Math.max(120, window.innerHeight - margin - 80);
+    const maxH = Math.max(120, window.innerHeight - margin - 140);
     let scale = Math.floor(Math.min(maxW / SCREEN_W, maxH / SCREEN_H));
     if (!isFinite(scale) || scale < 1) scale = 1;
     canvas.style.width = (SCREEN_W * scale) + 'px';
     canvas.style.height = (SCREEN_H * scale) + 'px';
   }
   window.addEventListener('resize', updateScale);
-  window.addEventListener('orientationchange', () => { setTimeout(updateScale, 100); });
+  window.addEventListener('orientationchange', () => { setTimeout(updateScale, 120); });
 
-  // --- mobile input: D-pad buttons & swipe gestures ---
-  function setDir(nd){
-    const d = game.snake.dir;
-    if (d[0] + nd[0] === 0 && d[1] + nd[1] === 0) return;
-    game.snake.dir = nd.slice ? nd.slice() : [nd[0], nd[1]];
-  }
-
-  // wire D-pad buttons (pointer events work for touch & mouse)
-  const bindBtn = (sel, dir) => {
-    const el = document.querySelector(sel);
-    if (!el) return;
-    el.addEventListener('pointerdown', (ev) => { ev.preventDefault(); setDir(dir); }, {passive:false});
-    // also allow pointerup to stop repeating etc (no-op for now)
-    el.addEventListener('pointerup', (ev) => ev.preventDefault(), {passive:false});
-  };
-  bindBtn('.dbtn.up', [0,-1]);
-  bindBtn('.dbtn.down', [0,1]);
-  bindBtn('.dbtn.left', [-1,0]);
-  bindBtn('.dbtn.right', [1,0]);
-
-  // swipe detection on canvas
-  let touchStart = null;
-  const SWIPE_MIN = 18; // pixels
-  canvas.addEventListener('touchstart', e => {
-    if (e.touches.length > 0){
-      const t = e.touches[0];
-      touchStart = {x: t.clientX, y: t.clientY};
-    }
-  }, {passive:true});
-
-  canvas.addEventListener('touchmove', e => {
-    // prevent scrolling while playing
-    if (!touchStart) return;
-    e.preventDefault();
-  }, {passive:false});
-
-  canvas.addEventListener('touchend', e => {
-    if (!touchStart) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchStart.x;
-    const dy = t.clientY - touchStart.y;
-    touchStart = null;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_MIN){
-      setDir(dx > 0 ? [1,0] : [-1,0]);
-    } else if (Math.abs(dy) > SWIPE_MIN){
-      setDir(dy > 0 ? [0,1] : [0,-1]);
-    }
-  }, {passive:false});
-
-  // Prevent two-finger gesture zoom on mobile
-  window.addEventListener('gesturestart', (e) => e.preventDefault());
-
-  // --- existing game implementation (unchanged from prior file) ---
+  // Input helpers
   function readHigh() { const v = parseInt(localStorage.getItem(HSKEY) || '0', 10); return Number.isNaN(v) ? 0 : v; }
   function writeHigh(v) { try{ localStorage.setItem(HSKEY, String(v)); }catch(e){} }
   function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
@@ -187,6 +118,7 @@ document.querySelectorAll('.dbtn').forEach(btn => {
   function containsPos(arr, pos){ return arr.some(p => equalPos(p,pos)); }
   function hasObstacle(set, pos){ return set.some(p => equalPos(p,pos)); }
 
+  // Game objects
   function createSnake() {
     const cx = Math.floor(GRID_W/2), cy = Math.floor(GRID_H/2);
     return { body: [[cx,cy],[cx-1,cy],[cx-2,cy]], dir: [1,0], growPending: 0 };
@@ -202,6 +134,7 @@ document.querySelectorAll('.dbtn').forEach(btn => {
     return [0,0];
   }
 
+  // Game state
   let game = null;
   function newGame(){
     return { snake: createSnake(), obstacles: [], score: 0, speed: INITIAL_SPEED, food: null, high: readHigh(), gameOver: false };
@@ -211,9 +144,10 @@ document.querySelectorAll('.dbtn').forEach(btn => {
     game = newGame();
     game.food = placeFood(game);
     updateUi();
-    updateScale(); // ensure proper canvas size when restarting
+    updateScale();
   }
 
+  // Core game logic
   function stepGame(){
     if (game.gameOver) return;
     const s = game.snake;
@@ -223,8 +157,14 @@ document.querySelectorAll('.dbtn').forEach(btn => {
     s.body.unshift(head);
     if (s.growPending > 0) s.growPending-- ;
     else s.body.pop();
-    for (let i=1;i<s.body.length;i++){ if (equalPos(head, s.body[i])) { endGame(); return; } }
+
+    // self collision
+    for (let i=1;i<s.body.length;i++){
+      if (equalPos(head, s.body[i])) { endGame(); return; }
+    }
+    // obstacle collision
     if (hasObstacle(game.obstacles, head)) { endGame(); return; }
+    // food eaten
     if (equalPos(head, game.food)){
       game.score += 1;
       s.growPending += 1;
@@ -234,6 +174,7 @@ document.querySelectorAll('.dbtn').forEach(btn => {
       updateUi();
     }
   }
+
   function spawnObstacle(){
     for (let i=0;i<200;i++){
       const p = [randInt(0,GRID_W-1), randInt(0,GRID_H-1)];
@@ -245,11 +186,13 @@ document.querySelectorAll('.dbtn').forEach(btn => {
       game.obstacles.push(p); break;
     }
   }
+
   function endGame(){
     game.gameOver = true;
     if (game.score > game.high){ game.high = game.score; writeHigh(game.high); updateUi(); }
   }
 
+  // Keyboard controls
   const keyMap = {
     'ArrowUp': [0,-1], 'w':[0,-1], 'W':[0,-1],
     'ArrowDown':[0,1], 's':[0,1], 'S':[0,1],
@@ -268,42 +211,107 @@ document.querySelectorAll('.dbtn').forEach(btn => {
     }
   });
 
+  // Mobile D-pad & swipe
+  function trySetDir(nd){
+    if (!game) return;
+    const d = game.snake.dir;
+    if (d[0] + nd[0] === 0 && d[1] + nd[1] === 0) return;
+    game.snake.dir = nd.slice ? nd.slice() : [nd[0], nd[1]];
+  }
+  function bindBtn(id, dir){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('pointerdown', (ev) => { ev.preventDefault(); trySetDir(dir); }, {passive:false});
+    el.addEventListener('touchstart', (ev) => { ev.preventDefault(); trySetDir(dir); }, {passive:false});
+  }
+  bindBtn('btn-up', [0,-1]);
+  bindBtn('btn-down', [0,1]);
+  bindBtn('btn-left', [-1,0]);
+  bindBtn('btn-right', [1,0]);
+
+  // swipe detection on canvas
+  let touchStart = null;
+  const SWIPE_MIN = 18;
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length > 0){
+      const t = e.touches[0];
+      touchStart = {x: t.clientX, y: t.clientY};
+    }
+  }, {passive:true});
+  canvas.addEventListener('touchmove', e => { if (!touchStart) return; e.preventDefault(); }, {passive:false});
+  canvas.addEventListener('touchend', e => {
+    if (!touchStart) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStart.x;
+    const dy = t.clientY - touchStart.y;
+    touchStart = null;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_MIN){
+      trySetDir(dx > 0 ? [1,0] : [-1,0]);
+    } else if (Math.abs(dy) > SWIPE_MIN){
+      trySetDir(dy > 0 ? [0,1] : [0,-1]);
+    }
+  }, {passive:false});
+  window.addEventListener('gesturestart', (e) => e.preventDefault());
+
+  // Drawing
   function draw(){
     ctx.fillStyle = COLOR_BG; ctx.fillRect(0,0,SCREEN_W,SCREEN_H);
+
+    // subtle grid
     ctx.strokeStyle = COLOR_GRID; ctx.lineWidth = 1; ctx.beginPath();
     for (let x=0;x<=SCREEN_W;x+=CELL_SIZE){ ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,SCREEN_H); }
     for (let y=0;y<=SCREEN_H;y+=CELL_SIZE){ ctx.moveTo(0,y+0.5); ctx.lineTo(SCREEN_W,y+0.5); }
     ctx.stroke();
+
+    // obstacles
     for (const o of game.obstacles) drawCell(o, COLOR_OBS, true);
+    // food
     drawCell(game.food, COLOR_FOOD, true);
-    for (let i=0;i<game.snake.body.length;i++){ const seg = game.snake.body[i]; drawCell(seg, i===0 ? COLOR_SNAKE : COLOR_SNAKE_BODY, true); }
-    drawScanlines();
+    // snake
+    for (let i=0;i<game.snake.body.length;i++){
+      const seg = game.snake.body[i];
+      drawCell(seg, i===0 ? COLOR_SNAKE : COLOR_SNAKE_BODY, true);
+    }
+
+    // scanlines
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    for (let y=0;y<SCREEN_H;y+=4){ ctx.fillRect(0,y,SCREEN_W,2); }
+
+    // HUD
     ctx.fillStyle = COLOR_TEXT; ctx.font = '14px monospace';
     ctx.fillText(`SCORE: ${game.score}`, 8, 16);
     ctx.fillText(`HIGH: ${game.high}`, 8, 34);
     ctx.fillText(`SPD: ${game.speed.toFixed(1)}`, 8, SCREEN_H - 8);
+
     if (game.gameOver){
       ctx.fillStyle = COLOR_TEXT; ctx.font = '48px monospace';
       const txt = 'GAME OVER'; const m = ctx.measureText(txt);
       ctx.fillText(txt, (SCREEN_W - m.width)/2, SCREEN_H/2 - 6);
-      ctx.font = '18px monospace'; const sub = 'Press R to restart'; const ms = ctx.measureText(sub);
+      ctx.font = '18px monospace';
+      const sub = 'Press R to restart';
+      const ms = ctx.measureText(sub);
       ctx.fillText(sub, (SCREEN_W - ms.width)/2, SCREEN_H/2 + 22);
     }
   }
+
   function drawCell(p, color, border=true){
     const [x,y] = p; const rx = x * CELL_SIZE; const ry = y * CELL_SIZE;
     ctx.fillStyle = color; ctx.fillRect(rx, ry, CELL_SIZE, CELL_SIZE);
-    if (border){ ctx.strokeStyle = '#0008'; ctx.lineWidth = 1; const inset = Math.max(1, Math.floor(CELL_SIZE/6));
+    if (border){
+      ctx.strokeStyle = '#0008'; ctx.lineWidth = 1;
+      const inset = Math.max(1, Math.floor(CELL_SIZE/6));
       ctx.strokeRect(rx+inset/2, ry+inset/2, CELL_SIZE-inset, CELL_SIZE-inset);
     }
   }
-  function drawScanlines(){ ctx.fillStyle = 'rgba(0,0,0,0.06)'; for (let y=0;y<SCREEN_H;y+=4){ ctx.fillRect(0,y,SCREEN_W,2); } }
+
   function updateUi(){ scoreEl.textContent = `SCORE: ${game.score}`; highEl.textContent = `HIGH: ${game.high}`; spdEl.textContent = `SPD: ${game.speed.toFixed(1)}`; }
 
-  // loop with accumulator
-  let lastTime = performance.now(); let acc = 0;
+  // Game loop with fixed-step accumulator
+  let lastTime = performance.now();
+  let acc = 0;
   function loop(now){
-    const dt = (now - lastTime) / 1000; lastTime = now; acc += dt;
+    const dt = (now - lastTime) / 1000; lastTime = now;
+    acc += dt;
     const stepTime = 1 / Math.max(0.0001, game.speed);
     while (acc >= stepTime){ acc -= stepTime; if (!game.gameOver) stepGame(); }
     draw(); requestAnimationFrame(loop);
