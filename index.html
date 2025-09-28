@@ -8,7 +8,17 @@
   :root{ --cell-size:16px; }
   html,body{height:100%;margin:0;background:#06060a;color:#b4e6ff;font-family:monospace; -webkit-user-select:none; user-select:none;}
   .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:12px;box-sizing:border-box;position:relative;}
-  canvas{image-rendering:pixelated;border:6px solid #06060a;background:#0a0a14;display:block; touch-action:none;}
+  /* keep pixel look but limit scaling so it never over-zooms */
+  canvas{
+    image-rendering:pixelated;
+    border:6px solid #06060a;
+    background:#0a0a14;
+    display:block;
+    touch-action:none;
+    max-width: calc(100vw - 36px);
+    height: auto;
+    margin: 8px auto;
+  }
   .ui{margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
   .hint{opacity:.95;font-size:14px}
   button{background:#13202b;color:#bfeaff;border:1px solid #234;border-radius:4px;padding:6px 10px;cursor:pointer}
@@ -102,10 +112,17 @@
     const margin = 36;
     const maxW = Math.max(120, window.innerWidth - margin);
     const maxH = Math.max(120, window.innerHeight - margin - 140);
+    // integer scale so pixels stay crisp; prefer shrinking to enlarging
     let scale = Math.floor(Math.min(maxW / SCREEN_W, maxH / SCREEN_H));
     if (!isFinite(scale) || scale < 1) scale = 1;
-    canvas.style.width = (SCREEN_W * scale) + 'px';
-    canvas.style.height = (SCREEN_H * scale) + 'px';
+    // cap scale to avoid extreme zoom on very large screens
+    const MAX_SCALE = 3;
+    if (scale > MAX_SCALE) scale = MAX_SCALE;
+    // set CSS width (use auto height to preserve aspect ratio)
+    const cssWidth = Math.min(SCREEN_W * scale, window.innerWidth - margin);
+    canvas.style.width = cssWidth + 'px';
+    canvas.style.height = 'auto';
+    canvas.style.maxWidth = 'calc(100vw - 36px)';
   }
   window.addEventListener('resize', updateScale);
   window.addEventListener('orientationchange', () => { setTimeout(updateScale, 120); });
